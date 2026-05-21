@@ -71,6 +71,20 @@ def list_remotes() -> dict[str, dict]:
     return load().get("remotes", {})
 
 
+def parse_remote_path(arg: str) -> tuple[str, str]:
+    """Parse ``name:remote/path`` into ``(name, "remote/path")``.
+
+    Raises ``ValueError`` if the colon is missing or the remote half is empty.
+    A bare path before the colon is allowed to be empty (root): ``alysis:``.
+    """
+    if ":" not in arg:
+        raise ValueError(f"expected 'name:remote/path', got: {arg!r}")
+    name, _, path = arg.partition(":")
+    if not name:
+        raise ValueError(f"empty remote name in: {arg!r}")
+    return name, path.lstrip("/")
+
+
 def _dump(data: dict) -> str:
     """Minimal TOML emitter for our flat schema: top-level scalars + [remotes.<name>] tables."""
     lines: list[str] = []
