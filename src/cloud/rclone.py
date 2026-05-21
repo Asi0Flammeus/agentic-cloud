@@ -118,3 +118,42 @@ def has_remote(name: str) -> bool:
 def lsd(remote: str) -> None:
     """Cheap auth+connectivity probe: list root directories on the remote."""
     _run(["lsd", f"{remote}:"])
+
+
+def reveal(obscured: str) -> str:
+    """Reverse of obscure: recover cleartext from rclone's obfuscated form."""
+    return _run(["reveal", obscured]).stdout.strip()
+
+
+def copyto(local: str, remote: str) -> None:
+    """rclone copyto <local> <remote:path> — copy a single file, preserving its name."""
+    _run(["copyto", local, remote])
+
+
+def mount_args(name: str, mount_path: Path, mode: str, cache_size: str, cache_age: str) -> list[str]:
+    """Argv tail for `rclone mount` — shared between live-mount and systemd unit ExecStart."""
+    args = ["mount", f"{name}:", str(mount_path)]
+    if mode == "vfs":
+        args += [
+            "--vfs-cache-mode", "full",
+            "--vfs-cache-max-size", cache_size,
+            "--vfs-cache-max-age", cache_age,
+        ]
+    return args
+
+
+def mount_daemon(name: str, mount_path: Path, mode: str, cache_size: str, cache_age: str) -> None:
+    """Detached mount via `rclone mount --daemon`. Returns once mount is ready or errors."""
+    args = mount_args(name, mount_path, mode, cache_size, cache_age)
+    args.insert(1, "--daemon")  # right after "mount"
+    _run(args)
+
+
+def unmount(path: Path) -> None:
+    """Release a FUSE mount via fusermount3 (fall back to fusermount). Raise on EBUSY."""
+    bin_ = shutil.which("fusermount3") or shutil.which("fusermount")
+    if bin_ is None:
+        raise RcloneError(["fusermount3", "-u", str(path)], 127, "fusermount3 not on PATH")
+    proc = subprocess.run([bin_, "-u", str(path)], capture_output=True, text=True, check=False)
+    if proc.returncode != 0:
+        raise RcloneError([bin_, "-u", str(path)], proc.returncode, proc.stderr)
