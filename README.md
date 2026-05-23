@@ -1,117 +1,62 @@
-# agentic-cloud — `cloud` CLI
+# cloud — multi-Nextcloud CLI
 
-Multi-Nextcloud CLI on top of `rclone`. Pilot several Nextcloud accounts with per-folder modes (full sync / VFS) and gogcli-parity share URLs.
+A thin Python CLI on top of `rclone` that gives you real VFS mounts, multi-account management, and gogcli-style public share URLs for your Nextcloud(s).
 
-## Why
+## Why this exists
 
-Nextcloud Desktop on Linux has no real VFS (only `.nextcloud` placeholders), no CLI surface, and crashes on VFS enable. `rclone` covers all 3 modes (full / VFS-FUSE / selective), handles multi-account natively, and is fully CLI-driven. `cloud` is a thin layer that gives you one TOML, idempotent commands, a `doctor` check, systemd auto-mount, and `--share` URLs (Nextcloud OCS API).
+Nextcloud Desktop on Linux is not a serious tool for keeping multiple accounts and large stores usable:
 
-## Prerequisites
+- **No real VFS.** The Linux client only does "suffix placeholders" (`*.nextcloud` files), which break `find`, `grep`, IDE indexers, Obsidian, and basically any tool that walks a tree. The maintainer confirmed (mid-2026) there is no plan to add FUSE.
+- **No CLI surface.** You can't script it, you can't drive it from an agent, you can't `cloud doctor` your way out of a stuck mount.
+- **Multi-account is clunky.** Multiple desktop processes, multiple sync dirs, no unified status, share URLs require GUI clicks.
 
-| tool | install |
-|---|---|
-| `rclone` ≥ 1.69 | `https://rclone.org/install/` (or use the `.deb` from `downloads.rclone.org`) |
-| `uv` | `https://docs.astral.sh/uv/` |
-| Python ≥ 3.11 | (Ubuntu 24.04 ships 3.12) |
-| `fusermount3` | `apt install fuse3` |
+`rclone` already solves all of this — real FUSE VFS, multi-backend, scriptable. What was missing was a thin opinionated wrapper that:
+
+- Keeps one TOML as the source of truth for all your Nextcloud accounts
+- Generates and maintains `rclone.conf` and systemd user units from it
+- Adds a `cloud doctor` that catches stale mounts, FUSE missing, cache full
+- Exposes `cloud push file remote:path --share` returning the public URL on stdout (same UX as gogcli for Google Drive)
+- Stays out of your way: idempotent commands, explicit exit codes, no surprises after the initial `account add`
+
+## 30-second taste
+
+```bash
+cloud account add work https://nc.example.com/remote.php/dav/files/me
+# prompts for username + Nextcloud app password
+
+cloud mount work --mode vfs --auto
+ls ~/clouds/work/                              # browse, no downloads
+cat ~/clouds/work/notes.md                     # this file gets cached, others don't
+
+cloud push report.pdf work:reports/q2.pdf --share
+# → ✓ Uploaded report.pdf → work:reports/q2.pdf
+# → ✓ Public link: https://nc.example.com/s/aBcDeFgH
+
+cloud status   # one-line state per account
+cloud doctor   # diagnostics
+```
 
 ## Install
 
-```bash
-cd ~/repos/Asi0Flammeus/agentic-cloud
-uv sync
-./bin/cloud doctor
-```
+See [INSTALL.md](INSTALL.md) for prerequisites, the full command reference, the config schema, exit codes, and the systemd auto-mount section.
 
-Optional: symlink `./bin/cloud` into your PATH (`ln -s "$(pwd)/bin/cloud" ~/.local/bin/cloud`).
+## Status
 
-## Quickstart — one account
+v1 is shipped. Roadmap below.
 
-```bash
-# 1. Register the WebDAV endpoint (use a Nextcloud app password, not your login pw)
-cloud account add crqpt https://cloud.crqpt.com/remote.php/dav/files/asi0
-
-# 2. Verify auth + connectivity
-cloud account test crqpt
-
-# 3. Mount it (VFS by default; --auto installs systemd user unit for boot persistence)
-cloud mount crqpt --mode vfs --auto
-
-# 4. Use it
-ls ~/clouds/crqpt/
-echo "hello" > ~/clouds/crqpt/hello.txt   # writes propagate to Nextcloud
-
-# 5. Diagnostics
-cloud status
-cloud doctor
-```
-
-## Share URLs (gogcli parity)
-
-```bash
-# Push + immediately get a public link
-cloud push /tmp/devis.pdf alysis:clients/x/devis.pdf --share
-# → ✓ Uploaded ...
-# → ✓ Public link: https://drive.alysis.cat/s/aBcDeFgHiJkL
-
-# Or create/revoke a link on an already-uploaded file
-cloud share   alysis:clients/x/devis.pdf
-cloud share   alysis:clients/x/devis.pdf --revoke
-cloud share-list alysis
-```
-
-## Full command surface (v1)
-
-| command | purpose |
+| feature | status |
 |---|---|
-| `cloud account add <name> <url>` | register a Nextcloud account (prompts for user + app password) |
-| `cloud account list / test / remove` | manage accounts |
-| `cloud mount <name> [--mode vfs\|full] [--mount-path PATH] [--auto]` | FUSE-mount a remote |
-| `cloud unmount <name>` | release a mount |
-| `cloud status` | tabular state of every configured remote |
-| `cloud doctor` | rclone + FUSE + mounts + cache health |
-| `cloud push <local> <name>:<remote-path> [--share]` | upload one file (optional public link) |
-| `cloud share <name>:<path> [--revoke]` | create / remove public link |
-| `cloud share-list <name>` | list active public links |
+| account management + `doctor` | ✓ v1 |
+| mount / unmount / status (VFS + full mode) | ✓ v1 |
+| systemd user-unit auto-mount | ✓ v1 |
+| `push`, `share`, `share-list` (Nextcloud OCS API) | ✓ v1 |
+| `pull`, `ls`, `cat`, `sync` (bisync) | v1.1 |
+| subpath mounts (`name:sub`), selective mode | v1.1 |
+| share password + expiry | v1.1 |
+| `cache evict` / `cache size` commands | v1.1 |
+| `--json` output everywhere | v1.1 |
+| encrypted rclone config password | v1.1 |
 
-## Configuration
+## License
 
-Single source of truth: `~/.config/agentic-cloud/config.toml`. `cloud` generates `~/.config/rclone/rclone.conf` from it. Credentials live only in `rclone.conf` (mode `0600`, obscured via `rclone obscure`), never in TOML.
-
-```toml
-[remotes.crqpt]
-url = "https://cloud.crqpt.com/remote.php/dav/files/asi0"
-mount = "~/clouds/crqpt"
-mode = "vfs"
-vfs_cache = "5G"
-vfs_max_age = "168h"
-auto = true
-```
-
-## Systemd auto-mount
-
-`cloud mount <name> --auto` writes a user unit at `~/.config/systemd/user/cloud-<name>.service` and enables it. For **boot survival** (mount comes up even when you're not logged in), enable user-linger:
-
-```bash
-sudo loginctl enable-linger $USER
-```
-
-Without linger, the units only start when you log in.
-
-## Exit codes
-
-| code | meaning |
-|---|---|
-| 0 | success |
-| 1 | config error (bad TOML, unknown remote, bad args) |
-| 2 | mount error (rclone failure, FUSE busy, path conflict) |
-| 3 | rclone subprocess error (network, auth, etc.) |
-| 4 | share / OCS API error |
-
-## Deferred to v1.1+
-
-- `cloud pull`, `cloud ls`, `cloud cat`, `cloud sync` (bisync)
-- subpath mounts (`name:sub`), `--selective <patterns>`
-- share password + expiry
-- `--json` output
-- encrypted rclone config password
+No license declared yet — all rights reserved by default. If you want to use it, open an issue.
