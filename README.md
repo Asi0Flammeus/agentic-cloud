@@ -1,3 +1,5 @@
+![cloud — multi-Nextcloud CLI](assets/banner.png)
+
 # cloud — multi-Nextcloud CLI
 
 A thin Python CLI on top of `rclone` that gives you real VFS mounts, multi-account management, and gogcli-style public share URLs for your Nextcloud(s).
@@ -6,7 +8,7 @@ A thin Python CLI on top of `rclone` that gives you real VFS mounts, multi-accou
 
 Nextcloud Desktop on Linux is not a serious tool for keeping multiple accounts and large stores usable:
 
-- **No real VFS.** The Linux client only does "suffix placeholders" (`*.nextcloud` files), which break `find`, `grep`, IDE indexers, Obsidian, and basically any tool that walks a tree. The maintainer confirmed (mid-2026) there is no plan to add FUSE.
+- **No real VFS.** The Linux client only does "suffix placeholders" (`*.nextcloud` files), which break `find`, `grep`, IDE indexers, Obsidian, and basically any tool that walks a tree. The maintainer confirmed there is no plan to add FUSE.
 - **No CLI surface.** You can't script it, you can't drive it from an agent, you can't `cloud doctor` your way out of a stuck mount.
 - **Multi-account is clunky.** Multiple desktop processes, multiple sync dirs, no unified status, share URLs require GUI clicks.
 
@@ -36,27 +38,14 @@ cloud status   # one-line state per account
 cloud doctor   # diagnostics
 ```
 
-## Install
+## Install & reference
 
 See [INSTALL.md](INSTALL.md) for prerequisites, the full command reference, the config schema, exit codes, and the systemd auto-mount section.
 
-## Status
+## What's in, what's coming
 
-v1 is shipped. Roadmap below.
-
-| feature | status |
-|---|---|
-| account management + `doctor` | ✓ v1 |
-| mount / unmount / status (VFS + full mode) | ✓ v1 |
-| systemd user-unit auto-mount | ✓ v1 |
-| `push`, `share`, `share-list` (Nextcloud OCS API) | ✓ v1 |
-| `pull`, `ls`, `cat`, `sync` (bisync) | v1.1 |
-| subpath mounts (`name:sub`), selective mode | v1.1 |
-| share password + expiry | v1.1 |
-| `cache evict` / `cache size` commands | v1.1 |
-| `--json` output everywhere | v1.1 |
-| encrypted rclone config password | v1.1 |
+See [ROADMAP.md](ROADMAP.md).
 
 ## License
 
-No license declared yet — all rights reserved by default. If you want to use it, open an issue.
+[MIT](LICENSE).
