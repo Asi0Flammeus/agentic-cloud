@@ -105,7 +105,7 @@ def run() -> int:
             elif mount.is_mounted(target):
                 mount_state = f"  mounted at {target}"
                 if fields.get("mode") == "vfs":
-                    cache_used = mount.cache_size_bytes(mount.cache_dir(name))
+                    cache_used = mount.cache_disk_bytes(mount.cache_dir(name))
                     cap_bytes = _parse_size_to_bytes(fields.get("vfs_cache", "5G")) or 0
                     if cap_bytes > 0:
                         pct = (cache_used / cap_bytes) * 100

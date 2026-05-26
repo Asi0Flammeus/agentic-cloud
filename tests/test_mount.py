@@ -53,6 +53,18 @@ def test_cache_size_bytes_missing_dir(tmp_path):
     assert mount.cache_size_bytes(tmp_path / "does-not-exist") == 0
 
 
+def test_cache_disk_bytes_missing_dir(tmp_path):
+    assert mount.cache_disk_bytes(tmp_path / "does-not-exist") == 0
+
+
+def test_cache_disk_bytes_counts_allocated_blocks(tmp_path):
+    file = tmp_path / "sparse.bin"
+    with file.open("wb") as f:
+        f.truncate(10 * 1024 * 1024)
+    assert mount.cache_size_bytes(tmp_path) == 10 * 1024 * 1024
+    assert mount.cache_disk_bytes(tmp_path) < mount.cache_size_bytes(tmp_path)
+
+
 def test_mount_unknown_remote_raises():
     with pytest.raises(LookupError):
         mount.mount("ghost")

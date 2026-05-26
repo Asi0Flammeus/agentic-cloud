@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -39,8 +40,16 @@ def render_unit(
     """
     rclone_bin = rclone_bin or rclone.which() or "/usr/bin/rclone"
     args = rclone.mount_args(name, mount_path, mode, cache_size, cache_age)
+    log_dir = Path.home() / ".cache" / "agentic-cloud"
+    log_file = log_dir / f"rclone-{name}.log"
+    args += [
+        "--log-level", "NOTICE",
+        "--log-file", str(log_file),
+        "--log-file-max-size", "10M",
+        "--log-file-max-backups", "3",
+    ]
     # First arg is "mount"; drop it because rclone_bin already named.
-    cmdline = " ".join([rclone_bin, *args])
+    cmdline = shlex.join([rclone_bin, *args])
     return f"""[Unit]
 Description=cloud {name} (rclone WebDAV mount)
 After=network-online.target
@@ -48,10 +57,14 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+ExecStartPre=/bin/mkdir -p {log_dir}
+ExecStartPre=/bin/sh -c '{shlex.join(["/usr/bin/timeout", "30s", rclone_bin, "lsd", f"{name}:"])} >/dev/null'
 ExecStart={cmdline}
 ExecStop=/bin/fusermount3 -u {mount_path}
-Restart=on-failure
-RestartSec=5
+TimeoutStartSec=60
+Restart=always
+RestartSec=20
+StartLimitIntervalSec=0
 KillMode=process
 
 [Install]

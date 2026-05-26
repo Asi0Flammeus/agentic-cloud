@@ -31,10 +31,15 @@ def test_render_unit_vfs():
     )
     assert "[Unit]" in body
     assert "Description=cloud crqpt" in body
+    assert "ExecStartPre=/bin/sh -c '/usr/bin/timeout 30s /usr/bin/rclone lsd crqpt: >/dev/null'" in body
     assert "ExecStart=/usr/bin/rclone mount crqpt: /home/asi0/clouds/crqpt --vfs-cache-mode full --vfs-cache-max-size 5G --vfs-cache-max-age 168h" in body
+    assert "--vfs-cache-min-free-space 80G" in body
+    assert "--daemon-timeout 20s" in body
+    assert "--log-file" in body
     assert "ExecStop=/bin/fusermount3 -u /home/asi0/clouds/crqpt" in body
     assert "WantedBy=default.target" in body
     assert "Type=simple" in body
+    assert "Restart=always" in body
 
 
 def test_render_unit_full_mode_omits_vfs_flags():
@@ -47,6 +52,7 @@ def test_render_unit_full_mode_omits_vfs_flags():
         rclone_bin="/usr/bin/rclone",
     )
     assert "--vfs-cache-mode" not in body
+    assert "--dir-cache-time 30m" in body
     assert "ExecStart=/usr/bin/rclone mount crqpt: /tmp/x" in body
 
 

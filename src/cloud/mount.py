@@ -66,6 +66,7 @@ def is_stale(path: Path) -> bool:
 
 
 def cache_size_bytes(path: Path) -> int:
+    """Logical file size in bytes. Sparse VFS cache files can make this much larger than disk use."""
     if not path.exists():
         return 0
     total = 0
@@ -73,6 +74,19 @@ def cache_size_bytes(path: Path) -> int:
         try:
             if f.is_file():
                 total += f.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def cache_disk_bytes(path: Path) -> int:
+    """Actual disk blocks consumed by the cache."""
+    if not path.exists():
+        return 0
+    total = 0
+    for f in path.rglob("*"):
+        try:
+            total += f.stat().st_blocks * 512
         except OSError:
             continue
     return total

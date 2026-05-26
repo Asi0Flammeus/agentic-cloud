@@ -138,7 +138,20 @@ def mount_args(name: str, mount_path: Path, mode: str, cache_size: str, cache_ag
             "--vfs-cache-mode", "full",
             "--vfs-cache-max-size", cache_size,
             "--vfs-cache-max-age", cache_age,
+            "--vfs-cache-min-free-space", "80G",
+            "--vfs-cache-poll-interval", "10m",
         ]
+    args += [
+        "--dir-cache-time", "30m",
+        "--poll-interval", "0",
+        "--daemon-timeout", "20s",
+        "--timeout", "30s",
+        "--contimeout", "10s",
+        "--retries", "2",
+        "--low-level-retries", "3",
+        "--transfers", "2",
+        "--checkers", "4",
+    ]
     return args
 
 
