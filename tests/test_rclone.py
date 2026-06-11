@@ -109,3 +109,14 @@ def test_mount_args_min_free_configurable():
     assert args[args.index("--vfs-cache-min-free-space") + 1] == "10G"
     default = rclone.mount_args("crqpt", Path("/x"), "vfs", "5G", "168h")
     assert default[default.index("--vfs-cache-min-free-space") + 1] == "80G"
+
+
+def test_sync_oneway_backup_dir(monkeypatch):
+    captured = []
+
+    class FakeProc:
+        stdout = ""
+
+    monkeypatch.setattr(rclone, "_run", lambda args, **k: captured.append(args) or FakeProc())
+    rclone.sync_oneway("crqpt:r", "/l", backup_dir="/trash")
+    assert captured[0][-2:] == ["--backup-dir", "/trash"]

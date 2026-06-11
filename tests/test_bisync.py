@@ -187,13 +187,14 @@ def test_queue_pushes_then_reconciles(monkeypatch):
     _mklocal(QUEUE_PAIR, "rec.mp4")
     seq = []
     monkeypatch.setattr(rclone, "copy", lambda src, dst, *, min_age=None: seq.append(("push", src, dst, min_age)) or "")
-    monkeypatch.setattr(rclone, "sync_oneway", lambda src, dst, *, min_age=None: seq.append(("reconcile", src, dst, min_age)) or "")
+    monkeypatch.setattr(rclone, "sync_oneway", lambda src, dst, *, min_age=None, backup_dir=None: seq.append(("reconcile", src, dst, min_age, backup_dir)) or "")
     res = bisync.run_pair(QUEUE_PAIR)
     assert res["ok"] is True
     local = bisync._expand("~/local/Videos/raw")
     assert seq == [
         ("push", local, "crqpt:Videos/raw", bisync.MIN_AGE),
-        ("reconcile", "crqpt:Videos/raw", local, bisync.MIN_AGE),
+        ("reconcile", "crqpt:Videos/raw", local, bisync.MIN_AGE,
+         str(bisync.state_dir().parent / "queue-trash" / "videos-raw")),
     ]
 
 

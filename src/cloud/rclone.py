@@ -237,16 +237,21 @@ def copy(src: str, dst: str, *, min_age: str | None = None) -> str:
     return _run(args).stdout
 
 
-def sync_oneway(src: str, dst: str, *, min_age: str | None = None) -> str:
+def sync_oneway(src: str, dst: str, *, min_age: str | None = None, backup_dir: str | None = None) -> str:
     """rclone sync <src> <dst> — one-way MIRROR: dst follows src, deletions included.
 
     *min_age* excludes fresh files on BOTH sides: they are neither transferred
     nor deleted (rclone leaves filtered-out destination files alone), which
     shields an in-progress recording from the queue reconcile pass.
+
+    *backup_dir* turns deletions/overwrites on dst into moves into that dir —
+    a local trash so a surprising src-side deletion never destroys data.
     """
     args = ["sync", src, dst, *BISYNC_CONN]
     if min_age:
         args += ["--min-age", min_age]
+    if backup_dir:
+        args += ["--backup-dir", backup_dir]
     return _run(args).stdout
 
 

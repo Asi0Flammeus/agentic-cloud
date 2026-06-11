@@ -172,8 +172,11 @@ def _run_queue(label: str, local: str, remote: str, *, push_only: bool = False) 
     except rclone.RcloneError as e:
         return _result(label, error=f"push failed: {e.stderr or e}")
     if not push_only:
+        # Reconciled-away files land in a local trash, not oblivion: if something
+        # remote-side deletes unexpectedly, the recording is still recoverable.
+        trash = state_dir().parent / "queue-trash" / label
         try:
-            rclone.sync_oneway(remote, local, min_age=MIN_AGE)
+            rclone.sync_oneway(remote, local, min_age=MIN_AGE, backup_dir=str(trash))
         except rclone.RcloneError as e:
             return _result(label, error=f"reconcile failed: {e.stderr or e}")
     _marker(label).touch()
