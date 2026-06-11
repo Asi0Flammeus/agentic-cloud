@@ -88,6 +88,36 @@ sudo loginctl enable-linger $USER
 
 Without linger, the unit only starts when you log in.
 
+### Sleep guard for FUSE mounts
+
+Network-backed FUSE mounts should be detached before suspend. Otherwise a
+process that is walking the mount (`git status`, an editor, an indexer, `mv`)
+can wait in the kernel for rclone while rclone waits on WebDAV/DNS that is being
+torn down for sleep. That can make userspace freeze fail and create a repeated
+lid-close suspend loop.
+
+Install the sleep guard on machines using auto-mounted cloud remotes:
+
+```bash
+scripts/install-sleep-guard
+```
+
+The installer performs the explicit root-side steps:
+
+```bash
+sudo install -m 0755 scripts/agentic-cloud-sleep-guard /usr/local/sbin/agentic-cloud-sleep-guard
+sudo install -m 0644 systemd/agentic-cloud-sleep-guard.service /etc/systemd/system/agentic-cloud-sleep-guard.service
+sudo install -m 0644 systemd/agentic-cloud-sleep-guard.env.example /etc/default/agentic-cloud-sleep-guard
+sudo systemctl daemon-reload
+sudo systemctl enable agentic-cloud-sleep-guard.service
+```
+
+Edit `/etc/default/agentic-cloud-sleep-guard` when the local account names or
+mount paths differ from the example. On suspend, the guard stops the configured
+user units and lazily detaches their FUSE mountpoints. On resume, it starts the
+same user units with `--no-block`, so resume is not held hostage by Wi-Fi or DNS
+settling.
+
 ## Tip: keep system indexers out of `~/clouds/`
 
 GNOME's `tracker-miner-fs-3`, KDE's `baloo`, and similar will happily walk a new mountpoint and force-download every file via `stat`. Drop a `.nomedia` file at the parent of your mounts to keep them out:

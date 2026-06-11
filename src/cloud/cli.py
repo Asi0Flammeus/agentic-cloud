@@ -8,12 +8,14 @@ import typer
 
 from pathlib import Path
 
-from cloud import __version__, config, doctor, mount as mount_mod, rclone
+from cloud import __version__, bisync as bisync_mod, config, doctor, mount as mount_mod, rclone
 
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, help="Multi-Nextcloud CLI on top of rclone.")
 account_app = typer.Typer(no_args_is_help=True, help="Manage Nextcloud account remotes.")
 app.add_typer(account_app, name="account")
+sync_app = typer.Typer(no_args_is_help=True, help="Bidirectional rclone bisync of always-local folders.")
+app.add_typer(sync_app, name="sync")
 
 
 def _version_callback(value: bool) -> None:
@@ -123,8 +125,10 @@ def mount_cmd(
     name: Annotated[str, typer.Argument(help="Remote name as configured.")],
     mode: Annotated[str, typer.Option("--mode", help="vfs | full")] = "vfs",
     mount_path: Annotated[str | None, typer.Option("--mount-path", help="Override mount path (default ~/clouds/<name>).")] = None,
-    cache_size: Annotated[str, typer.Option("--cache-size", help="VFS cache size cap.")] = "5G",
-    cache_age: Annotated[str, typer.Option("--cache-age", help="VFS cache max age.")] = "168h",
+    cache_size: Annotated[str | None, typer.Option("--cache-size", help="VFS cache size cap (default: config value, else 5G).")] = None,
+    cache_age: Annotated[str | None, typer.Option("--cache-age", help="VFS cache max age (default: config value, else 168h).")] = None,
+    min_free: Annotated[str | None, typer.Option("--min-free", help="Min free disk space the VFS cache must leave (default: config value, else 80G).")] = None,
+    exclude: Annotated[list[str] | None, typer.Option("--exclude", help="Anchored rclone pattern (e.g. /Downloads/) to hide a path owned by `cloud sync`. Repeatable. Requires unmount+remount to change.")] = None,
     auto: Annotated[bool, typer.Option("--auto/--no-auto", help="Install + enable systemd user unit for boot persistence.")] = False,
 ) -> None:
     """Mount a configured remote as a local FUSE filesystem."""
@@ -139,6 +143,8 @@ def mount_cmd(
             mount_path=Path(mount_path) if mount_path else None,
             cache_size=cache_size,
             cache_age=cache_age,
+            min_free=min_free,
+            exclude=exclude or None,
         )
     except LookupError as e:
         typer.echo(f"error: {e}", err=True)
@@ -331,6 +337,166 @@ def share_list_cmd(
         return
     for link in links:
         typer.echo(f"  [{link.id}] {link.path}  →  {link.url}")
+
+
+def _default_label(remote_path: str) -> str:
+    """crqpt:Videos/raw -> 'videos-raw'; Downloads -> 'downloads'."""
+    return remote_path.strip("/").replace("/", "-").lower() or "root"
+
+
+@sync_app.command("add")
+def sync_add(
+    remote: Annotated[str, typer.Argument(help="<name>:<remote-path>, e.g. crqpt:Downloads")],
+    local: Annotated[str, typer.Argument(help="Local directory, e.g. ~/local/Downloads")],
+    label: Annotated[str | None, typer.Option("--label", help="Pair name (default: derived from remote path).")] = None,
+    interval: Annotated[int, typer.Option("--interval", help="Timer cadence in seconds.")] = 60,
+    strategy: Annotated[str, typer.Option("--strategy", help="Sync engine: bisync (bidirectional), mirror (one-way local→remote), queue (push up, mirror the remote queue back).")] = "bisync",
+    seed: Annotated[bool, typer.Option("--seed/--no-seed", help="Copy remote->local before the baseline resync. Use --no-seed if local is already populated.")] = True,
+) -> None:
+    """Register a sync pair and establish the baseline (seed from remote, then resync).
+
+    Seeding before the resync guarantees local ⊇ remote, so the baseline can never
+    delete remote content.
+    """
+    try:
+        name, remote_path = config.parse_remote_path(remote)
+    except ValueError as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(code=1)
+    if config.get_remote(name) is None:
+        typer.echo(f"error: no such remote '{name}'", err=True)
+        raise typer.Exit(code=1)
+    if not remote_path:
+        typer.echo("error: a remote sub-path is required, e.g. crqpt:Downloads", err=True)
+        raise typer.Exit(code=1)
+    if strategy not in config.SYNC_STRATEGIES:
+        typer.echo(f"error: --strategy must be one of {', '.join(config.SYNC_STRATEGIES)}", err=True)
+        raise typer.Exit(code=1)
+
+    lbl = label or _default_label(remote_path)
+    pair = {"label": lbl, "local": local, "remote": f"{name}:{remote_path}", "interval": interval, "strategy": strategy}
+    config.set_sync_pair(lbl, local=local, remote=f"{name}:{remote_path}", interval=interval, strategy=strategy)
+
+    typer.echo(f"→ initializing '{lbl}'  {name}:{remote_path}  ↔  {local}")
+    if seed:
+        typer.echo("  seeding local from remote (one-way copy, may take a while)…")
+    try:
+        result = bisync_mod.initialize(pair) if seed else bisync_mod.run_pair(pair, force_resync=True)
+    except rclone.RcloneNotInstalled as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(code=3)
+    if not result["ok"]:
+        typer.echo(f"✗ {lbl}: {result['error']}", err=True)
+        typer.echo("  (pair registered; fix the cause and re-run: cloud sync add … or cloud sync run)", err=True)
+        raise typer.Exit(code=2)
+    typer.echo(f"✓ '{lbl}' synced and registered (interval {interval}s)")
+    typer.echo("  enable the background timer with: cloud sync auto")
+
+
+@sync_app.command("run")
+def sync_run(
+    label: Annotated[str | None, typer.Argument(help="Run only this pair (default: all).")] = None,
+    all_: Annotated[bool, typer.Option("--all", help="Run every pair (explicit; same as passing no label).")] = False,
+) -> None:
+    """Run one bidirectional cycle for all pairs (or just one). Used by the systemd timer."""
+    results = bisync_mod.run_all(labels=[label] if label else None)
+    if not results:
+        typer.echo("No sync pairs configured." if not label else f"No such pair '{label}'.")
+        return
+    failed = 0
+    for r in results:
+        if r["skipped"]:
+            typer.echo(f"  ↷ {r['label']}: already running, skipped")
+        elif r["ok"]:
+            tag = " (resync)" if r["resynced"] else ""
+            typer.echo(f"  ✓ {r['label']}{tag}")
+        else:
+            failed += 1
+            typer.echo(f"  ✗ {r['label']}: {r['error']}", err=True)
+    if failed:
+        raise typer.Exit(code=2)
+
+
+@sync_app.command("watch")
+def sync_watch() -> None:
+    """Watch local folders and push to remote on change (foreground; used by the watch service)."""
+    if not config.list_sync_pairs():
+        typer.echo("No sync pairs configured.")
+        return
+    typer.echo("watching local folders for changes (Ctrl-C to stop)…")
+    try:
+        bisync_mod.watch(on_sync=lambda label: typer.echo(f"  ↑ pushed {label}"))
+    except FileNotFoundError:
+        typer.echo("error: inotifywait not found — install inotify-tools", err=True)
+        raise typer.Exit(code=3)
+    except KeyboardInterrupt:
+        raise typer.Exit(code=0)
+
+
+@sync_app.command("status")
+def sync_status() -> None:
+    """Show configured sync pairs and their baseline state."""
+    pairs = config.list_sync_pairs()
+    if not pairs:
+        typer.echo("No sync pairs configured. Try: cloud sync add crqpt:Downloads ~/local/Downloads")
+        return
+    from cloud import systemd
+    timer = "on" if systemd.sync_timer_enabled() else "off"
+    watch = "on" if systemd.sync_watch_enabled() else "off"
+    width = max(len(p["label"]) for p in pairs)
+    typer.echo(f"  timer: {timer}   instant-push (watch): {watch}")
+    typer.echo(f"  {'LABEL'.ljust(width)}  STRATEGY  STATE          REMOTE → LOCAL")
+    for p in pairs:
+        state = "uninitialized" if bisync_mod.needs_resync(p["label"]) else "synced"
+        typer.echo(f"  {p['label'].ljust(width)}  {p.get('strategy', 'bisync'):8}  {state:13}  {p['remote']} → {p['local']}")
+
+
+@sync_app.command("health")
+def sync_health() -> None:
+    """Per-pair sync health as JSON (consumed by the eww pill; humans welcome too)."""
+    import json as json_mod
+
+    typer.echo(json_mod.dumps(bisync_mod.load_health(), indent=1))
+
+
+@sync_app.command("auto")
+def sync_auto(
+    on: Annotated[bool, typer.Option("--on/--off", help="Enable or disable the background sync timer.")] = True,
+    interval: Annotated[int, typer.Option("--interval", help="Timer cadence in seconds (on).")] = 60,
+) -> None:
+    """Install/enable (or remove) the systemd user timer that runs `cloud sync run --all`."""
+    from cloud import systemd
+    if not on:
+        removed = systemd.uninstall_sync()
+        typer.echo("✓ Sync timer disabled and removed." if removed else "No sync timer was installed.")
+        return
+    try:
+        _svc, tmr = systemd.enable_sync(interval)
+    except Exception as e:
+        typer.echo(f"error: {e}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        systemd.enable_watch()
+        watch_note = "✓ Instant push (inotify watcher) enabled"
+    except Exception as e:
+        watch_note = f"⚠ Instant-push watcher not enabled: {e}"
+    typer.echo(f"✓ Sync timer enabled (every {interval}s)")
+    typer.echo(f"  {tmr}")
+    typer.echo(f"  {watch_note}")
+    if not systemd.lingering_enabled():
+        typer.echo("⚠ user-linger is OFF — the timer only runs while you're logged in.")
+        typer.echo("  To run across logouts/reboots: sudo loginctl enable-linger $USER")
+
+
+@sync_app.command("remove")
+def sync_remove(
+    label: Annotated[str, typer.Argument(help="Pair label to remove.")],
+) -> None:
+    """Unregister a sync pair (does NOT delete local files or remote data)."""
+    if config.remove_sync_pair(label):
+        typer.echo(f"✓ Removed sync pair '{label}' (local files and remote untouched).")
+    else:
+        typer.echo(f"No such sync pair '{label}'.")
 
 
 def _humanize_bytes(n: int) -> str:

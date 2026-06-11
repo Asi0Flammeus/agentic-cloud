@@ -1,0 +1,102 @@
+#!/bin/sh
+# Stop rclone FUSE mounts before system suspend and restart them after resume.
+#
+# Why this exists: a WebDAV-backed FUSE request can leave callers stuck in
+# uninterruptible kernel sleep if suspend tears down Wi-Fi/DNS while rclone is
+# serving the request. Stopping and lazily detaching the mounts before sleep
+# prevents that bad freeze loop.
+
+set -u
+
+CONFIG=/etc/default/agentic-cloud-sleep-guard
+if [ -r "$CONFIG" ]; then
+    # shellcheck disable=SC1090
+    . "$CONFIG"
+fi
+
+: "${AGENTIC_CLOUD_USER:=asi0}"
+: "${AGENTIC_CLOUD_UNITS:=cloud-crqpt.service cloud-alysis.service}"
+: "${AGENTIC_CLOUD_MOUNTS:=/home/asi0/clouds/crqpt /home/asi0/clouds/alysis}"
+: "${AGENTIC_CLOUD_STOP_TIMEOUT:=20s}"
+: "${AGENTIC_CLOUD_START_TIMEOUT:=20s}"
+
+log() {
+    printf '%s\n' "agentic-cloud-sleep-guard: $*"
+}
+
+user_systemctl() {
+    timeout_value=$1
+    shift
+
+    uid=$(/usr/bin/id -u "$AGENTIC_CLOUD_USER" 2>/dev/null) || {
+        log "user '$AGENTIC_CLOUD_USER' does not exist"
+        return 0
+    }
+
+    if [ ! -S "/run/user/$uid/bus" ]; then
+        log "user bus /run/user/$uid/bus is unavailable; skipping user systemctl $*"
+        return 0
+    fi
+
+    current_uid=$(/usr/bin/id -u)
+    if [ "$current_uid" = "$uid" ]; then
+        /usr/bin/timeout "$timeout_value" \
+            /usr/bin/env XDG_RUNTIME_DIR="/run/user/$uid" \
+            DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+            /usr/bin/systemctl --user "$@"
+        return $?
+    fi
+
+
+    /usr/bin/timeout "$timeout_value" \
+        /usr/sbin/runuser -u "$AGENTIC_CLOUD_USER" -- \
+        /usr/bin/env XDG_RUNTIME_DIR="/run/user/$uid" \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+        /usr/bin/systemctl --user "$@"
+}
+
+lazy_detach() {
+    mount_path=$1
+
+    if [ ! -d "$mount_path" ]; then
+        return 0
+    fi
+
+    if /usr/bin/mountpoint -q "$mount_path"; then
+        log "lazy-detaching $mount_path"
+        /bin/fusermount3 -uz "$mount_path" 2>/dev/null || /usr/bin/umount -l "$mount_path" 2>/dev/null || true
+    fi
+}
+
+pre_suspend() {
+    log "stopping user rclone mount units before sleep"
+    # Bound the stop. If systemd/rclone is already wedged, lazy FUSE detach below
+    # is the part that protects suspend.
+    user_systemctl "$AGENTIC_CLOUD_STOP_TIMEOUT" stop $AGENTIC_CLOUD_UNITS || true
+
+    for mount_path in $AGENTIC_CLOUD_MOUNTS; do
+        lazy_detach "$mount_path"
+    done
+}
+
+post_resume() {
+    log "starting user rclone mount units after resume"
+    # Do not block resume on network-online. The user units have their own
+    # connectivity probe and Restart=always; they can settle as the network comes back.
+    user_systemctl "$AGENTIC_CLOUD_START_TIMEOUT" start --no-block $AGENTIC_CLOUD_UNITS || true
+}
+
+case "${1:-}" in
+    pre)
+        pre_suspend
+        ;;
+    post)
+        post_resume
+        ;;
+    *)
+        printf 'usage: %s pre|post\n' "$0" >&2
+        exit 2
+        ;;
+esac
+
+exit 0

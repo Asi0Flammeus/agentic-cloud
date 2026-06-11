@@ -1,0 +1,20 @@
+#!/bin/sh
+# Install the root systemd sleep guard that detaches agentic-cloud FUSE mounts
+# before suspend and restarts their user units after resume.
+
+set -eu
+
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+sudo install -m 0755 "$repo_root/scripts/agentic-cloud-sleep-guard" /usr/local/sbin/agentic-cloud-sleep-guard
+sudo install -m 0644 "$repo_root/systemd/agentic-cloud-sleep-guard.service" /etc/systemd/system/agentic-cloud-sleep-guard.service
+
+if [ ! -e /etc/default/agentic-cloud-sleep-guard ]; then
+    sudo install -m 0644 "$repo_root/systemd/agentic-cloud-sleep-guard.env.example" /etc/default/agentic-cloud-sleep-guard
+else
+    printf '%s\n' "Keeping existing /etc/default/agentic-cloud-sleep-guard"
+fi
+
+sudo systemctl daemon-reload
+sudo systemctl enable agentic-cloud-sleep-guard.service
+sudo systemctl is-enabled agentic-cloud-sleep-guard.service

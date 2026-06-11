@@ -82,16 +82,42 @@ def test_mount_writes_toml_fields(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(
         "cloud.rclone.mount_daemon",
-        lambda name, mp, mode, cs, ca: calls.append((name, mp, mode, cs, ca)),
+        lambda name, mp, mode, cs, ca, exclude=None, min_free=None: calls.append((name, mp, mode, cs, ca, exclude)),
     )
     target, already = mount.mount("crqpt", mode="vfs", cache_size="2G", cache_age="48h")
     assert already is False
-    assert calls == [("crqpt", target, "vfs", "2G", "48h")]
+    assert calls == [("crqpt", target, "vfs", "2G", "48h", None)]
     remote = config.get_remote("crqpt")
     assert remote["mode"] == "vfs"
     assert remote["vfs_cache"] == "2G"
     assert remote["vfs_max_age"] == "48h"
     assert "mount" in remote
+
+
+def test_mount_threads_exclude_and_persists(monkeypatch):
+    config.set_remote("crqpt", url="https://nc.example.com")
+    monkeypatch.setattr(mount, "is_mounted", lambda p: False)
+    calls = []
+    monkeypatch.setattr(
+        "cloud.rclone.mount_daemon",
+        lambda name, mp, mode, cs, ca, exclude=None, min_free=None: calls.append(exclude),
+    )
+    mount.mount("crqpt", mode="vfs", exclude=["/Downloads/", "/Videos/raw/"])
+    assert calls == [["/Downloads/", "/Videos/raw/"]]
+    # persisted so a later remount reuses it
+    assert config.get_remote("crqpt")["mount_exclude"] == ["/Downloads/", "/Videos/raw/"]
+
+
+def test_mount_reuses_persisted_exclude_when_not_passed(monkeypatch):
+    config.set_remote("crqpt", url="https://nc.example.com", mount_exclude=["/Pictures/"])
+    monkeypatch.setattr(mount, "is_mounted", lambda p: False)
+    calls = []
+    monkeypatch.setattr(
+        "cloud.rclone.mount_daemon",
+        lambda name, mp, mode, cs, ca, exclude=None, min_free=None: calls.append(exclude),
+    )
+    mount.mount("crqpt", mode="vfs")  # no exclude passed
+    assert calls == [["/Pictures/"]]
 
 
 def test_mount_idempotent_when_already_mounted(monkeypatch):
@@ -107,3 +133,33 @@ def test_mount_idempotent_when_already_mounted(monkeypatch):
 def test_default_mount_path():
     assert mount.default_mount_path("alysis").name == "alysis"
     assert mount.default_mount_path("alysis").parent.name == "clouds"
+
+
+def test_mount_preserves_config_tuning_when_not_passed(monkeypatch):
+    # The 2026-05-23 clobber bug: a remount without explicit flags must reuse
+    # the user-edited config values, not silently revert to defaults.
+    config.set_remote("crqpt", url="https://nc.example.com", vfs_cache="50G", vfs_max_age="120h")
+    monkeypatch.setattr(mount, "is_mounted", lambda p: False)
+    calls = []
+    monkeypatch.setattr(
+        "cloud.rclone.mount_daemon",
+        lambda name, mp, mode, cs, ca, exclude=None, min_free=None: calls.append((cs, ca, min_free)),
+    )
+    mount.mount("crqpt", mode="vfs")  # no tuning flags passed
+    assert calls == [("50G", "120h", mount.DEFAULT_MIN_FREE)]
+    remote = config.get_remote("crqpt")
+    assert remote["vfs_cache"] == "50G"
+    assert remote["vfs_max_age"] == "120h"
+
+
+def test_mount_explicit_flags_override_config(monkeypatch):
+    config.set_remote("crqpt", url="https://nc.example.com", vfs_cache="50G", vfs_min_free="10G")
+    monkeypatch.setattr(mount, "is_mounted", lambda p: False)
+    calls = []
+    monkeypatch.setattr(
+        "cloud.rclone.mount_daemon",
+        lambda name, mp, mode, cs, ca, exclude=None, min_free=None: calls.append((cs, min_free)),
+    )
+    mount.mount("crqpt", mode="vfs", cache_size="2G")
+    assert calls == [("2G", "10G")]  # explicit beats config; config beats default
+    assert config.get_remote("crqpt")["vfs_cache"] == "2G"
