@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agentic-cloud v2 — recap de session</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@300..700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #ebe3d2; --paper: #f3ecdd; --ink: #2b2217; --sub: #6b5d45;
+  --rule: #c9bea4; --accent: #a14a28; --accent-2: #3d5a3d; --warn: #b8862a;
+  --paper-bg:
+    repeating-linear-gradient(0deg, rgba(90,70,40,0.018) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 30% 20%, rgba(180,140,80,0.10), transparent 50%);
+  --serif: "Fraunces", Georgia, serif;
+  --sans: "Inter", system-ui, sans-serif;
+  --mono: "DM Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg); background-image: var(--paper-bg);
+  color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.65;
+  padding-bottom: 96px;
+}
+.wrap { max-width: 760px; margin: 0 auto; padding: 24px 18px; }
+
+/* header */
+.eyebrow {
+  display: inline-block; font-family: var(--mono); font-size: 11px;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--sub);
+  border: 1px solid var(--rule); border-radius: 4px; padding: 3px 8px; background: var(--paper);
+}
+h1 { font-family: var(--serif); font-style: italic; font-weight: 560;
+  font-size: clamp(30px, 7vw, 44px); letter-spacing: -0.03em; margin: 14px 0 6px; }
+.subhead { font-family: var(--serif); font-style: italic; color: var(--sub); font-size: 17px; max-width: 56ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px;
+  font-family: var(--mono); font-size: 12px; color: var(--sub); }
+.meta b { color: var(--ink); font-weight: 500; }
+
+/* metrics avant/après */
+.metrics { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 28px 0 8px; }
+@media (min-width: 560px) { .metrics { grid-template-columns: 1fr 1fr; } }
+.metric { background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; }
+.metric .label { font-family: var(--mono); font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--sub); margin-bottom: 8px; }
+.metric .flow { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.metric .before { color: var(--accent); font-family: var(--mono); font-size: 14px; text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.metric .arrow { color: var(--sub); }
+.metric .after { color: var(--accent-2); font-family: var(--mono); font-size: 19px; font-weight: 500; }
+.metric .note { font-size: 12.5px; color: var(--sub); margin-top: 6px; font-style: italic; font-family: var(--serif); }
+
+/* sections */
+section { margin-top: 40px; }
+.sec-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 16px; }
+.sec-num { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+h2 { font-family: var(--serif); font-weight: 600; font-size: 22px; letter-spacing: -0.02em; }
+h3 { font-family: var(--serif); font-style: italic; font-size: 16.5px; margin: 18px 0 6px; }
+p { margin: 8px 0; max-width: 68ch; }
+.lead { font-size: 15.5px; }
+ul.clean { list-style: none; }
+ul.clean li { padding: 7px 0 7px 22px; position: relative; border-bottom: 1px dashed var(--rule); }
+ul.clean li:last-child { border-bottom: 0; }
+ul.clean li::before { content: "—"; position: absolute; left: 0; color: var(--accent); }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+code { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+.pill { display: inline-block; font-family: var(--mono); font-size: 11px; border-radius: 999px;
+  padding: 2px 10px; border: 1px solid; vertical-align: middle; }
+.pill.queue  { color: var(--accent);   border-color: var(--accent);   background: rgba(161,74,40,.07); }
+.pill.mirror { color: var(--warn);     border-color: var(--warn);     background: rgba(184,134,42,.08); }
+.pill.bisync { color: var(--accent-2); border-color: var(--accent-2); background: rgba(61,90,61,.08); }
+.pill.ok     { color: var(--accent-2); border-color: var(--accent-2); }
+
+/* timeline cards */
+.card { background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; padding: 16px 18px; margin: 12px 0; }
+.card .when { font-family: var(--mono); font-size: 11px; color: var(--sub); letter-spacing: .1em; }
+.card h3 { margin-top: 4px; }
+
+/* table -> cards on mobile */
+table { width: 100%; border-collapse: collapse; margin-top: 10px; background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--sub); background: rgba(201,190,164,.25); }
+tr:last-child td { border-bottom: 0; }
+td .small { font-size: 12.5px; color: var(--sub); display: block; margin-top: 2px; }
+@media (max-width: 559px) {
+  table, thead, tbody, tr, th, td { display: block; }
+  thead { display: none; }
+  tr { border-bottom: 2px solid var(--rule); padding: 6px 0; }
+  td { border-bottom: 0; padding: 4px 12px; }
+  td[data-l]::before { content: attr(data-l); display: block; font-family: var(--mono);
+    font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--sub); }
+}
+
+/* commits */
+.commits { font-family: var(--mono); font-size: 12.5px; }
+.commits li { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--rule); flex-wrap: wrap; }
+.commits .sha { color: var(--accent); }
+.commits .repo { color: var(--sub); }
+
+/* callouts */
+.callout { border-left: 3px solid var(--accent-2); background: var(--paper); border-radius: 0 10px 10px 0;
+  padding: 12px 16px; margin: 14px 0; }
+.callout.warn { border-left-color: var(--warn); }
+.callout .t { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--sub); margin-bottom: 4px; }
+
+/* annotation layer */
+#annot-btn { position: absolute; z-index: 50; min-height: 44px; padding: .5rem .95rem; border-radius: 999px;
+  font-size: 14px; font-family: var(--sans); background: var(--ink); color: var(--paper);
+  border: 0; box-shadow: 0 4px 14px rgba(43,34,23,.3); cursor: pointer; }
+mark.annotated { background: rgba(184,134,42,.25); border-bottom: 2px solid var(--warn); cursor: pointer; }
+#annot-modal { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(43,34,23,.45); z-index: 60; padding: 16px; }
+#annot-modal[hidden], #annot-btn[hidden] { display: none !important; }
+.annot-card { width: min(92vw, 440px); background: var(--paper); padding: 18px; border-radius: 14px; border: 1px solid var(--rule); }
+.annot-card blockquote { font-family: var(--serif); font-style: italic; color: var(--sub); font-size: 14px;
+  border-left: 3px solid var(--rule); padding-left: 10px; margin-bottom: 10px; max-height: 90px; overflow: auto; }
+#annot-text { width: 100%; min-height: 88px; font-size: 16px; font-family: var(--sans); padding: 10px;
+  border: 1px solid var(--rule); border-radius: 8px; background: #fff8; color: var(--ink); }
+.annot-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
+.annot-actions button { min-height: 44px; padding: 0 18px; border-radius: 8px; font-size: 14px; cursor: pointer; border: 1px solid var(--rule); background: var(--bg); color: var(--ink); }
+#annot-save { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* submit bar */
+.submit-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
+  background: var(--paper); border-top: 1px solid var(--rule);
+  padding: 12px max(18px, env(safe-area-inset-left)); display: flex; align-items: center; gap: 12px; }
+.submit-bar .info { font-family: var(--mono); font-size: 11.5px; color: var(--sub); flex: 1; min-width: 0; }
+.submit-bar .info b { color: var(--ink); }
+#submit-btn { min-height: 46px; padding: 0 22px; border-radius: 10px; border: 0; cursor: pointer;
+  background: var(--accent-2); color: var(--paper); font-size: 14.5px; font-family: var(--sans); font-weight: 600; }
+#submit-btn:disabled { opacity: .5; cursor: default; }
+#toast { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); z-index: 70;
+  background: var(--ink); color: var(--paper); padding: 10px 18px; border-radius: 10px; font-size: 14px; }
+#toast[hidden] { display: none !important; }
+.hint { font-family: var(--serif); font-style: italic; color: var(--sub); font-size: 13.5px;
+  text-align: center; margin: 34px auto 8px; max-width: 46ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header data-section="header">
+    <span class="eyebrow">centaur · session recap · 2026-06-11</span>
+    <h1>agentic-cloud v2</h1>
+    <p class="subhead">D'un livelock silencieux de 24h à un sync par stratégies — diagnostic, grill, redesign, implémentation et déploiement dans la même session.</p>
+    <div class="meta">
+      <span>commits <b>5</b></span>
+      <span>tests <b>88 ✓</b></span>
+      <span>backlog résorbé <b>19.7 GB</b></span>
+      <span>pairs <b>4/4 verts</b></span>
+    </div>
+  </header>
+
+  <div class="metrics" data-section="metriques">
+    <div class="metric">
+      <div class="label">Cycle de sync</div>
+      <div class="flow"><span class="before">kill à 300s, ∞</span><span class="arrow">→</span><span class="after">~13 s</span></div>
+      <div class="note">le timer tuait chaque upload en plein vol depuis 24h</div>
+    </div>
+    <div class="metric">
+      <div class="label">Backlog videos-raw</div>
+      <div class="flow"><span class="before">19.7 GB bloqués</span><span class="arrow">→</span><span class="after">0</span></div>
+      <div class="note">4 vidéos d'avril jamais arrivées sur NC — la racine de tout</div>
+    </div>
+    <div class="metric">
+      <div class="label">Panne silencieuse</div>
+      <div class="flow"><span class="before">24h+ sans signal</span><span class="arrow">→</span><span class="after">self-heal + mx</span></div>
+      <div class="note">health.json, pill eww, escalade Matrix après 24h</div>
+    </div>
+    <div class="metric">
+      <div class="label">« Fuite mémoire 14 GB »</div>
+      <div class="flow"><span class="before">14 GB ?!</span><span class="arrow">→</span><span class="after">mythe</span></div>
+      <div class="note">page cache de lecture des mp4 ; RSS réel rclone ≈ 310 MB</div>
+    </div>
+  </div>
+
+  <section data-section="diagnostic">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Diagnostic — l'anatomie du livelock</h2></div>
+    <p class="lead">Symptôme ressenti : « ça rame, ça bug ». Réalité mesurée :</p>
+    <ul class="clean">
+      <li>4 vidéos d'avril (<b>19.7 GB</b>) existaient en local mais n'avaient <b>jamais</b> atteint <code>crqpt:Videos/raw</code>.</li>
+      <li>Chaque cycle bisync tentait l'upload ; <code>TimeoutStartSec=300</code> le SIGTERM-ait en plein transfert → reprise à l'octet 0 toutes les 5 min, à l'infini.</li>
+      <li>Chaque kill laissait un lock rclone <code>.lck</code> empoisonné → les cycles suivants échouaient instantanément.</li>
+      <li>Uplink saturé en permanence → les mounts WebDAV (<code>~/clouds/*</code>) étouffaient : timeouts http2/TLS — c'était ça, le « rame ».</li>
+      <li>Aggravant : <code>rec</code> faisait écrire ffmpeg directement dans le nom final → le watcher inotify bisync-ait un fichier en cours d'écriture pendant les meetings.</li>
+    </ul>
+    <div class="callout">
+      <div class="t">racine conceptuelle</div>
+      Des heuristiques calibrées pour un vault de 8 800 fichiers markdown (timer 60s, timeout 300s, bisync-everything) appliquées uniformément à des recordings multi-GB. Le mécanisme n'était pas cassé — il était <em>mal assorti à la sémantique des données</em>.
+    </div>
+  </section>
+
+  <section data-section="grill">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Grill — la sémantique de chaque flux</h2></div>
+    <p>Session <code>/grill-me</code> : chaque pair a livré son vrai cycle de vie, et chaque réponse a fixé une stratégie.</p>
+    <table>
+      <thead><tr><th>Pair</th><th>Stratégie</th><th>Sémantique actée</th></tr></thead>
+      <tbody>
+        <tr>
+          <td data-l="pair"><span class="mono">videos-raw</span><span class="small">26 fichiers · 58 GB</span></td>
+          <td data-l="stratégie"><span class="pill queue">queue · 120s</span></td>
+          <td data-l="sémantique">File de traitement : le laptop produit, les envoys serveur consomment puis archivent. Le local <b>miroite la file remote</b> — traité côté serveur = supprimé localement.</td>
+        </tr>
+        <tr>
+          <td data-l="pair"><span class="mono">pictures / downloads</span><span class="small">~10k fichiers · 5.6 GB</span></td>
+          <td data-l="stratégie"><span class="pill mirror">mirror · 300s</span></td>
+          <td data-l="sémantique">Production locale, NC = backup, offline garanti. One-way local→remote, <b>le tri local fait foi</b> (corbeille NC en filet).</td>
+        </tr>
+        <tr>
+          <td data-l="pair"><span class="mono">nondual-mind</span><span class="small">8 800 fichiers · 4.7 GB</span></td>
+          <td data-l="stratégie"><span class="pill bisync">bisync · 180s</span></td>
+          <td data-l="sémantique">Seul vrai bidirectionnel : laptop éditeur principal + envoys qui écrivent des synthèses. Pull 1–5 min suffit ; push local instantané via inotify.</td>
+        </tr>
+      </tbody>
+    </table>
+    <ul class="clean" style="margin-top:14px">
+      <li><b>Bande passante</b> : full speed, aucun cap — les agents doivent recevoir les raws au plus vite.</li>
+      <li><b>Pannes</b> : self-heal d'abord ; si cassé &gt;24h → message Matrix saved + état dans le pill eww.</li>
+      <li><b>Mounts</b> : « snappy comme du local » — caching agressif conservé, pré-chauffage VFS en suite.</li>
+    </ul>
+  </section>
+
+  <section data-section="implementation">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Implémentation — v2 en TDD</h2></div>
+    <ul class="clean">
+      <li>Champ <code>strategy</code> par pair (<code>queue|mirror|bisync</code>, défaut bisync = backcompat totale).</li>
+      <li><b>queue</b> : push <code>rclone copy --min-age 2m</code> puis reconcile <code>rclone sync remote→local</code> — gated sur le succès du push, jamais sur un fichier &lt;2 min (un enregistrement en cours est intouchable).</li>
+      <li><b>mirror</b> : <code>rclone sync local→remote</code> avec fusible source-vide (un dossier local manquant ne peut pas vider le remote).</li>
+      <li><b>Self-heal</b> : purge des locks rclone orphelins quand aucun process vivant ne les détient.</li>
+      <li><b>health.json</b> + <code>cloud sync health</code> ; intervalle par pair respecté ; les pairs lourds passent en dernier.</li>
+      <li><b>Escalade</b> : un seul message mx par épisode de panne, après 24h.</li>
+      <li><code>TimeoutStartSec</code> 300s → <b>4h</b> : un long transfert idempotent doit survivre ; l'anti-chevauchement appartient aux flocks.</li>
+      <li>Fix du <b>clobber config</b> au remount + <code>--min-free</code> configurable (était hardcodé 80G).</li>
+      <li><b>rec</b> : enregistre en <code>.ogg.partial</code> + rename atomique au stop — le watcher ne voit plus que le fichier fini.</li>
+      <li><b>queue-trash</b> : les suppressions du reconcile partent dans <code>~/.cache/agentic-cloud/queue-trash/</code> au lieu d'être détruites.</li>
+    </ul>
+    <h3>Commits</h3>
+    <ul class="commits clean" style="list-style:none">
+      <li><span class="sha">7a1b622</span><span class="repo">agentic-cloud</span><span>docs: v2 redesign — per-pair sync strategies</span></li>
+      <li><span class="sha">0823480</span><span class="repo">agentic-cloud</span><span>feat(sync): v2 per-pair strategies — queue, mirror, bisync</span></li>
+      <li><span class="sha">424bfaf</span><span class="repo">agentic-cloud</span><span>feat(sync): queue reconcile deletions go to a local trash</span></li>
+      <li><span class="sha">762c181</span><span class="repo">centaur-infra</span><span>fix(rec): stage recording as .partial, rename on stop</span></li>
+    </ul>
+    <p class="mono" style="color:var(--sub); font-size:12.5px; margin-top:8px">88 tests verts · aucun push (local only)</p>
+  </section>
+
+  <section data-section="incident">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Incident live — le .ogg disparu</h2></div>
+    <p>Pendant le déploiement, le <code>.ogg</code> de 13:13 a disparu du remote puis du local (reconcile fidèle). Enquête à chaud : ni l'envoy (playbook l'interdit), ni le sync (queue/mirror ne suppriment jamais le remote).</p>
+    <div class="callout">
+      <div class="t">résolution</div>
+      Confirmé par asi0 : c'était un <b>test pour un envoy</b> — suppression volontaire, comportement queue exactement comme designé. Le doute aura quand même accouché du filet <b>queue-trash</b>, qui reste en place : toute suppression reconcile est désormais récupérable localement.
+    </div>
+  </section>
+
+  <section data-section="deploiement">
+    <div class="sec-head"><span class="sec-num">05</span><h2>Déploiement &amp; vérification</h2></div>
+    <ul class="clean">
+      <li>Drop-in temporaire 2h posé en live → l'upload des 19.7 GB a enfin pu <b>finir</b> (27 min) ; lock expiré seul via <code>--max-lock</code>.</li>
+      <li>Config basculée, units systemd régénérées (4h baked-in, drop-in supprimé), watch relancé sur le code v2.</li>
+      <li>Listings bisync obsolètes purgés pour les pairs convertis.</li>
+      <li>Pill eww enrichi : pairs en échec + âge de la panne, fallback propre sans health.json.</li>
+      <li>Vérifié : cycle propre par pair sous sa nouvelle stratégie, intervalles respectés, flocks anti-chevauchement OK, <span class="pill ok">4/4 verts · 0 échec</span></li>
+    </ul>
+  </section>
+
+  <section data-section="suites">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Fils restants</h2></div>
+    <ul class="clean">
+      <li><b>Pré-chauffage VFS</b> (« snappy comme du local ») : <code>rclone rc vfs/refresh recursive</code> après mount + périodique — designé dans <code>docs/v2-redesign.md</code>, non implémenté.</li>
+      <li>Cosmétique : le skip d'intervalle affiche « already running, skipped » — libellé trompeur, à distinguer.</li>
+      <li>La purge du <code>queue-trash</code> est manuelle pour l'instant (pas de rotation).</li>
+      <li>Quand le flux d'archivage envoy sera réel : valider le miroir de file en production (premier vrai raw→archive).</li>
+    </ul>
+  </section>
+
+  <p class="hint">Sélectionne n'importe quel passage (drag ou long-press) pour annoter — tes commentaires partent avec le submit.</p>
+</div>
+
+<button id="annot-btn" hidden>💬 Commenter</button>
+<div id="annot-modal" hidden>
+  <div class="annot-card">
+    <blockquote id="annot-quote"></blockquote>
+    <textarea id="annot-text" placeholder="Ton commentaire…" rows="3"></textarea>
+    <div class="annot-actions">
+      <button id="annot-cancel">Annuler</button>
+      <button id="annot-save">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<div class="submit-bar">
+  <div class="info">topic <b>centaur-cloud-v2-recap-lahd1</b><br><span id="annot-count">0 annotation</span></div>
+  <button id="submit-btn">Envoyer le feedback</button>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+const TOPIC = "centaur-cloud-v2-recap-lahd1";
+const NTFY_URL = `https://ntfy.sh/${TOPIC}`;
+const annotations = [];
+let pendingRange = null;
+const $btn = document.getElementById("annot-btn");
+const $modal = document.getElementById("annot-modal");
+
+window.updateAnnotCount = function () {
+  const n = annotations.length;
+  document.getElementById("annot-count").textContent = `${n} annotation${n > 1 ? "s" : ""}`;
+};
+
+document.addEventListener("selectionchange", () => {
+  clearTimeout(window._selT);
+  window._selT = setTimeout(() => {
+    const sel = window.getSelection();
+    const text = sel.toString().trim();
+    if (!text || sel.rangeCount === 0) { $btn.hidden = true; return; }
+    pendingRange = sel.getRangeAt(0).cloneRange();
+    const r = pendingRange.getBoundingClientRect();
+    $btn.style.top = `${window.scrollY + r.top - 50}px`;
+    $btn.style.left = `${Math.max(8, window.scrollX + r.left)}px`;
+    $btn.hidden = false;
+  }, 250);
+});
+
+$btn.addEventListener("click", () => {
+  if (!pendingRange) return;
+  document.getElementById("annot-quote").textContent = pendingRange.toString().trim();
+  document.getElementById("annot-text").value = "";
+  $btn.hidden = true;
+  $modal.hidden = false;
+  document.getElementById("annot-text").focus();
+});
+
+document.getElementById("annot-cancel").addEventListener("click", () => { $modal.hidden = true; });
+
+document.getElementById("annot-save").addEventListener("click", () => {
+  const comment = document.getElementById("annot-text").value.trim();
+  const text = document.getElementById("annot-quote").textContent;
+  if (!comment) { $modal.hidden = true; return; }
+  const id = "a" + (annotations.length + 1);
+  const host = pendingRange.startContainer.parentElement;
+  const anchor =
+    host?.closest("[data-section]")?.getAttribute("data-section") ||
+    host?.closest("section")?.querySelector("h2")?.textContent?.trim() || null;
+  annotations.push({ id, text, comment, anchor, ts: new Date().toISOString() });
+  try {
+    const mark = document.createElement("mark");
+    mark.className = "annotated";
+    mark.dataset.id = id;
+    mark.title = comment;
+    pendingRange.surroundContents(mark);
+  } catch (_) {}
+  window.updateAnnotCount();
+  $modal.hidden = true;
+  pendingRange = null;
+});
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.hidden = false;
+  setTimeout(() => { t.hidden = true; }, 3500);
+}
+
+document.getElementById("submit-btn").addEventListener("click", async () => {
+  const payload = { ts: new Date().toISOString(), items: {}, annotations };
+  const btn = document.getElementById("submit-btn");
+  btn.disabled = true;
+  try {
+    const res = await fetch(NTFY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Title: "cloud-v2-recap-feedback" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    toast(annotations.length ? `✓ ${annotations.length} annotation(s) envoyée(s) — le daïmon les récupère.` : "✓ Reçu — lu sans commentaire.");
+  } catch (e) {
+    toast("✗ Échec d'envoi — réessaie ou ping-moi dans le terminal.");
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
